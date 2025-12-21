@@ -1,0 +1,95 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// NextAuth.js 필수 모델들
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// 사용자
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  username      String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+
+  accounts  Account[]
+  sessions  Session[]
+  developer Developer?
+  reviews   Review[]   @relation("ReviewAuthor")
+}
+
+// 개발자 프로필 (평가 대상으로 등록된 사용자)
+model Developer {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  bio       String?
+  githubUrl String
+  createdAt DateTime @default(now())
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviews Review[] @relation("ReviewTarget")
+}
+
+// 평가
+model Review {
+  id            String   @id @default(cuid())
+  reviewerId    String
+  developerId   String
+  documentation Int      // 문서화 (1-10)
+  speed         Int      // 개발 속도 (1-10)
+  codeQuality   Int      // 코드 품질 (1-10)
+  communication Int      // 연락 빈도 (1-10)
+  planning      Int      // 기획 능력 (1-10)
+  personality   Int      // 인성 (1-10)
+  comment       String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  reviewer  User      @relation("ReviewAuthor", fields: [reviewerId], references: [id], onDelete: Cascade)
+  developer Developer @relation("ReviewTarget", fields: [developerId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewerId, developerId]) // 중복 평가 방지
+}
